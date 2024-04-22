@@ -3,14 +3,17 @@ from typing import Dict
 from chaoslib.exceptions import FailedActivity
 from chaoslib.types import Configuration, Secrets
 
-from confluent_kafka.admin import KafkaException, AdminClient
+from confluent_kafka.admin import KafkaException, AdminClient, OffsetSpec
+from confluent_kafka import TopicPartition, ConsumerGroupTopicPartitions
+
 import json
 
 
 __all__ = [
     "describe_kafka_topic",
     "all_replicas_in_sync",
-    "cluster_doesnt_have_under_replicated_partitions"
+    "cluster_doesnt_have_under_replicated_partitions",
+    "check_consumer_lag_under_threshold"
     ]
 
 
@@ -111,5 +114,79 @@ def cluster_doesnt_have_under_replicated_partitions(
     except KafkaException as e:
         raise FailedActivity(
             "Failed to check if the cluster has under replicated partitions: "
+            f"{e}"
+        ) from e
+
+
+def check_consumer_lag_under_threshold(
+    bootstrap_servers: str = None, group_id: str = None,
+    topic: str = None, threshold: int = 0, partition: int = None,
+    configuration: Configuration = None, secrets: Secrets = None
+) -> bool:
+
+    """
+    The next function is to:
+
+    * Check if the consumer lag is under a certain threshold in any partition
+      or some specific partition.
+
+      The reason why this lag is calculated using AdminClient and not Consumer is
+      beacuse if you join as a consumer group with the same name that the consumer
+      that you want to calculate the consumer lag you will rebalance all the consumer
+      group
+
+      Consumer_lag = latest_offset_topic - consumer_offset
+      this function check if the consumer offset is under certain threshold and return
+      True if the lag is under the threshold.
+    """
+    try:
+        admin_client = AdminClient(
+            {'bootstrap.servers': bootstrap_servers}
+        )
+
+        topic_metadata = admin_client.list_topics(timeout=10)
+        partitions = topic_metadata.topics[topic].partitions.keys()
+
+        topic_partitions_offsets = {
+            TopicPartition(topic, partition): OffsetSpec._latest
+            for partition in partitions
+        }
+        topic_partitions_consumer_offsets = [
+            TopicPartition(topic, p) for p in partitions
+        ]
+        consumer_group_topic_partition = [
+            ConsumerGroupTopicPartitions(group_id, topic_partitions_consumer_offsets)
+        ]
+        topic_latest_offsets = admin_client.list_offsets(topic_partitions_offsets)
+        consumer_topic_offsets = admin_client.list_consumer_group_offsets(
+            consumer_group_topic_partition
+        )
+
+        offset_topic_data = {}
+        for res, f in topic_latest_offsets.items():
+            t = f.result()
+            offset_topic_data[str(res.partition)] = t.offset
+
+        offset_consumer_data = {}
+        for res, f in consumer_topic_offsets.items():
+            t = f.result()
+            t_partitions = t.topic_partitions
+            for p in t_partitions:
+                offset_consumer_data[str(p.partition)] = p.offset
+
+        lags = {
+            f"partition_{i[0]}":
+                offset_topic_data[i[0]] - offset_consumer_data[i[0]]
+            for i in offset_topic_data.items()
+        }
+
+        if partition is None:
+            return all(threshold > lag_value for lag_value in lags.values())
+        else:
+            return threshold > lags[f"partition_{partition}"]
+
+    except KafkaException as e:
+        raise FailedActivity(
+            "Failed to calculate the lag of the consumer group: "
             f"{e}"
         ) from e
