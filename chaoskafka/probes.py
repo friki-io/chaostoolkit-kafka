@@ -128,16 +128,19 @@ def check_consumer_lag_under_threshold(
     The next function is to:
 
     * Check if the consumer lag is under a certain threshold in any partition
-      or some specific partition.
+        or some specific partition.
 
-      The reason why this lag is calculated using AdminClient and not Consumer is
-      beacuse if you join as a consumer group with the same name that the consumer
-      that you want to calculate the consumer lag you will rebalance all the consumer
-      group
+    The reason why this lag is calculated using AdminClient and not Consumer
+    is because if you join as a consumer group with the same name as the
+    consumer that you want to calculate the consumer lag, it will rebalance
+    all the consumer group.
 
-      Consumer_lag = latest_offset_topic - consumer_offset
-      this function check if the consumer offset is under certain threshold and return
-      True if the lag is under the threshold.
+    There is another way to calculate the consumer lag using the consumer
+    object without joining the consumer group, using get_watermark_offsets.
+
+    Consumer_lag = latest_offset_topic - consumer_offset.
+    This function checks if the consumer offset is under a certain threshold
+    and returns True if the lag is under the threshold.
     """
     try:
         admin_client = AdminClient(
@@ -155,9 +158,14 @@ def check_consumer_lag_under_threshold(
             TopicPartition(topic, p) for p in partitions
         ]
         consumer_group_topic_partition = [
-            ConsumerGroupTopicPartitions(group_id, topic_partitions_consumer_offsets)
+            ConsumerGroupTopicPartitions(
+                group_id,
+                topic_partitions_consumer_offsets
+            )
         ]
-        topic_latest_offsets = admin_client.list_offsets(topic_partitions_offsets)
+        topic_latest_offsets = admin_client.list_offsets(
+            topic_partitions_offsets
+            )
         consumer_topic_offsets = admin_client.list_consumer_group_offsets(
             consumer_group_topic_partition
         )
