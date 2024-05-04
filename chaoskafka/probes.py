@@ -3,8 +3,10 @@ from typing import Dict
 from chaoslib.exceptions import FailedActivity
 from chaoslib.types import Configuration, Secrets
 
-from confluent_kafka.admin import KafkaException, AdminClient, OffsetSpec
-from confluent_kafka import TopicPartition, ConsumerGroupTopicPartitions
+from confluent_kafka.admin import KafkaException, AdminClient
+from confluent_kafka import (
+    TopicPartition,
+    Consumer)
 
 import json
 
@@ -129,70 +131,35 @@ def check_consumer_lag_under_threshold(
 
     * Check if the consumer lag is under a certain threshold in any partition
         or some specific partition.
-
-    The reason why this lag is calculated using AdminClient and not Consumer
-    is because if you join as a consumer group with the same name as the
-    consumer that you want to calculate the consumer lag, it will rebalance
-    all the consumer group.
-
-    There is another way to calculate the consumer lag using the consumer
-    object without joining the consumer group, using get_watermark_offsets.
-
-    Consumer_lag = latest_offset_topic - consumer_offset.
-    This function checks if the consumer offset is under a certain threshold
-    and returns True if the lag is under the threshold.
     """
     try:
-        admin_client = AdminClient(
-            {'bootstrap.servers': bootstrap_servers}
+        consumer = Consumer(
+            {'bootstrap.servers': bootstrap_servers, 'group.id': group_id}
         )
-
-        topic_metadata = admin_client.list_topics(timeout=10)
-        partitions = topic_metadata.topics[topic].partitions.keys()
-
-        topic_partitions_offsets = {
-            TopicPartition(topic, partition): OffsetSpec._latest
-            for partition in partitions
-        }
-        topic_partitions_consumer_offsets = [
-            TopicPartition(topic, p) for p in partitions
+        metadata = consumer.list_topics(topic, timeout=10)
+        if metadata.topics[topic].error is not None:
+            raise KafkaException(metadata.topics[topic].error)
+        partitions = [
+            TopicPartition(topic, p) for p in metadata.topics[topic].partitions
         ]
-        consumer_group_topic_partition = [
-            ConsumerGroupTopicPartitions(
-                group_id,
-                topic_partitions_consumer_offsets
-            )
-        ]
-        topic_latest_offsets = admin_client.list_offsets(
-            topic_partitions_offsets
-            )
-        consumer_topic_offsets = admin_client.list_consumer_group_offsets(
-            consumer_group_topic_partition
+        committed = consumer.committed(partitions, timeout=10)
+        lags = []
+        for partition in committed:
+            (lo, hi) = consumer.get_watermark_offsets(partition, timeout=10, 
+                                                      cached=False)
+            if hi < 0:
+                lag = "no hwmark"
+            elif partition.offset < 0:
+                lag = "%d" % (hi - lo)
+            else:
+                lag = "%d" % (hi - partition.offset)
+                lags.append(int(lag))
+        consumer.close()
+        return (
+            all(threshold > lag_value for lag_value in lags)
+            if partition is None
+            else threshold > lags[partition]
         )
-
-        offset_topic_data = {}
-        for res, f in topic_latest_offsets.items():
-            t = f.result()
-            offset_topic_data[str(res.partition)] = t.offset
-
-        offset_consumer_data = {}
-        for res, f in consumer_topic_offsets.items():
-            t = f.result()
-            t_partitions = t.topic_partitions
-            for p in t_partitions:
-                offset_consumer_data[str(p.partition)] = p.offset
-
-        lags = {
-            f"partition_{i[0]}":
-                offset_topic_data[i[0]] - offset_consumer_data[i[0]]
-            for i in offset_topic_data.items()
-        }
-
-        if partition is None:
-            return all(threshold > lag_value for lag_value in lags.values())
-        else:
-            return threshold > lags[f"partition_{partition}"]
-
     except KafkaException as e:
         raise FailedActivity(
             "Failed to calculate the lag of the consumer group: "
