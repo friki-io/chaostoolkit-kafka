@@ -4,8 +4,8 @@ from chaoslib.types import Configuration, Secrets
 from time import sleep
 import logging
 
-from confluent_kafka.admin import AdminClient, KafkaException
-from confluent_kafka import Consumer
+from confluent_kafka.admin import AdminClient
+from confluent_kafka import Consumer, KafkaException
 
 __all__ = ["delete_kafka_topic",
            "rebalance_consumer_group",
@@ -52,9 +52,7 @@ def rebalance_consumer_group(
     """
 
     if topic is None:
-        raise FailedActivity(
-            f"the topic {topic} to subscribe is empty"
-        )
+        raise FailedActivity("The topic to subscribe is None")
     try:
         consumer = Consumer(
             {'bootstrap.servers': bootstrap_servers, 'group.id': group_id}
@@ -88,13 +86,8 @@ def delete_consumer_group(
             [group_id], request_timeout=10
         )
         for group, future in groups.items():
-            try:
-                future.result()  # The result itself is None
-                logger.debug(f"Deleted group with id {group_id} successfully")
-            except KafkaException as e:
-                raise f"Error deleting group id {group_id}: {e}" from e
-            except Exception:
-                raise
+            future.result()  # The result itself is None
+            logger.debug(f"Deleted group with id {group_id} successfully")
 
         return True
     except Exception as e:

@@ -3,13 +3,14 @@ from typing import Dict
 from chaoslib.exceptions import FailedActivity
 from chaoslib.types import Configuration, Secrets
 
-from confluent_kafka.admin import KafkaException, AdminClient
+from confluent_kafka.admin import AdminClient
 from confluent_kafka import (
     TopicPartition,
-    Consumer)
+    Consumer,
+    KafkaException)
 
 import json
-
+import logging
 
 __all__ = [
     "describe_kafka_topic",
@@ -17,6 +18,8 @@ __all__ = [
     "cluster_doesnt_have_under_replicated_partitions",
     "check_consumer_lag_under_threshold"
     ]
+
+logger = logging.getLogger("chaostoolkit")
 
 
 def describe_kafka_topic(
@@ -144,17 +147,19 @@ def check_consumer_lag_under_threshold(
         ]
         committed = consumer.committed(partitions, timeout=10)
         lags = []
-        for partition in committed:
-            (lo, hi) = consumer.get_watermark_offsets(partition, timeout=10, 
+        for p in committed:
+            (lo, hi) = consumer.get_watermark_offsets(p, timeout=10,
                                                       cached=False)
             if hi < 0:
                 lag = "no hwmark"
-            elif partition.offset < 0:
+            elif p.offset < 0:
                 lag = "%d" % (hi - lo)
             else:
-                lag = "%d" % (hi - partition.offset)
+                lag = "%d" % (hi - p.offset)
                 lags.append(int(lag))
         consumer.close()
+        logger.debug(f"Consumer group {group_id} lags: {lags}")
+        logger.debug(f"partition: {partition}")
         return (
             all(threshold > lag_value for lag_value in lags)
             if partition is None
