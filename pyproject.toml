@@ -80,4 +80,4 @@ docstring-code-format = false
 [tool.pytest.ini_options]
 minversion = "6.0"
 testpaths = "tests"
-addopts = "-v -rxs --cov chaoskafka --cov-report term-missing:skip-covered -p no:warnings"
+addopts = "-v -rxs --cov chaoskafka --cov-report term-missing:skip-covered -p no:warnings --cov-fail-under=100"

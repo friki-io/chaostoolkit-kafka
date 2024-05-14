@@ -5,7 +5,7 @@ from time import sleep
 import logging
 
 from confluent_kafka.admin import AdminClient
-from confluent_kafka import Consumer, KafkaException
+from confluent_kafka import Consumer
 
 __all__ = ["delete_kafka_topic",
            "rebalance_consumer_group",
