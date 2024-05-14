@@ -8,6 +8,7 @@ from confluent_kafka import (
     TopicPartition,
     Consumer,
     KafkaException)
+from chaoskafka.utils import check_topic_exist
 
 import json
 import logging
@@ -40,8 +41,7 @@ def describe_kafka_topic(
 
         cluster_metadata = admin_client.list_topics(timeout=10)
 
-        if topic not in cluster_metadata.topics:
-            raise FailedActivity(f"Topic '{topic}' does not exist")
+        check_topic_exist(topic, cluster_metadata.topics)
 
         topic_metadata = cluster_metadata.topics[topic]
 
@@ -79,6 +79,9 @@ def all_replicas_in_sync(
         )
 
         cluster_metadata = admin_client.list_topics(timeout=10)
+
+        check_topic_exist(topic, cluster_metadata.topics)
+
         topic_metadata = cluster_metadata.topics[topic]
 
         return all(
@@ -150,13 +153,13 @@ def check_consumer_lag_under_threshold(
         for p in committed:
             (lo, hi) = consumer.get_watermark_offsets(p, timeout=10,
                                                       cached=False)
-            if hi < 0:
-                lag = "no hwmark"
-            elif p.offset < 0:
+
+            if p.offset < 0:
+                print("entro aqui")
                 lag = "%d" % (hi - lo)
             else:
                 lag = "%d" % (hi - p.offset)
-                lags.append(int(lag))
+            lags.append(int(lag))
         consumer.close()
         logger.debug(f"Consumer group {group_id} lags: {lags}")
         logger.debug(f"partition: {partition}")

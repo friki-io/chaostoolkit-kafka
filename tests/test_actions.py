@@ -119,6 +119,7 @@ def test_delete_consumer_group(mock_admin_client):
         ['test_group'], request_timeout=10
         )
 
+
 @patch('chaoskafka.actions.AdminClient')
 def test_delete_consumer_group_failed(mock_admin_client):
     mock_admin_instance = MagicMock()
@@ -141,5 +142,4 @@ def test_delete_consumer_group_failed(mock_admin_client):
     assert expected_error_message in str(
         exc_info.value
         )
-
 
