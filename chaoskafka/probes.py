@@ -1,17 +1,18 @@
-from typing import Dict
-
-from chaoslib.exceptions import FailedActivity
-from chaoslib.types import Configuration, Secrets
+from typing import Dict, Optional
+import json
+import logging
 
 from confluent_kafka.admin import AdminClient
 from confluent_kafka import (
     TopicPartition,
     Consumer,
     KafkaException)
+
+from chaoslib.exceptions import FailedActivity
+from chaoslib.types import Configuration, Secrets
+
 from chaoskafka.utils import check_topic_exist
 
-import json
-import logging
 
 __all__ = [
     "describe_kafka_topic",
@@ -128,7 +129,7 @@ def cluster_doesnt_have_under_replicated_partitions(
 
 def check_consumer_lag_under_threshold(
     bootstrap_servers: str = None, group_id: str = None,
-    topic: str = None, threshold: int = 0, partition: int = None,
+    topic: str = None, threshold: int = 0, partition: Optional[int] = None,
     configuration: Configuration = None, secrets: Secrets = None
 ) -> bool:
 
@@ -154,11 +155,7 @@ def check_consumer_lag_under_threshold(
             (lo, hi) = consumer.get_watermark_offsets(p, timeout=10,
                                                       cached=False)
 
-            if p.offset < 0:
-                print("entro aqui")
-                lag = "%d" % (hi - lo)
-            else:
-                lag = "%d" % (hi - p.offset)
+            lag = "%d" % (hi - lo) if p.offset < 0 else "%d" % (hi - p.offset)
             lags.append(int(lag))
         consumer.close()
         logger.debug(f"Consumer group {group_id} lags: {lags}")
