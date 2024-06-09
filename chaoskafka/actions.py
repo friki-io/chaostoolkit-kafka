@@ -15,6 +15,7 @@ from chaoslib.exceptions import FailedActivity
 from chaoslib.types import Configuration, Secrets
 
 from chaoskafka.utils import delivery_callback
+from chaoskafka.probes import describe_kafka_topic
 
 
 __all__ = ["delete_kafka_topic",
@@ -166,20 +167,29 @@ def consume_messages(
     if topic is None:
         raise FailedActivity("The topic to consume a message is None")
     try:
+        topic_data = describe_kafka_topic(bootstrap_servers, topic)
+        partitions = topic_data.partitions
+        if partition > partitions:
+            raise FailedActivity(
+                f"Partition {partition} does not exist in topic {topic}"
+            )
+        
+        
         consumer = Consumer(
             {
                 "bootstrap.servers": bootstrap_servers,
                 "group.id": group_id,
-                "auto.offset.reset": "earliest",
                 'enable.auto.commit': False,
-                "client.id": "0_test_asign_client"
+                "client.id": "0_asign_client"
             }
         )
-        topic_partition = TopicPartition(topic, partition, offset)
-        consumer.assign([topic_partition])
-
+        logger.info(f"Subscribing to topic {topic}")
+        consumer.subscribe([topic])
+        logger.info(f"Subscribed to topic {topic}")
         messages = []
         consumed_count = 0
+
+
 
         while num_messages is None or consumed_count < num_messages:
             msg = consumer.poll(timeout=1.0)
@@ -191,16 +201,19 @@ def consume_messages(
 
                 logger.debug(f"End of partition reached {msg.topic()}/"
                              f"{msg.partition()}")
-                break
-            logger.debug(
-                        f"Consumed message from {msg.topic()} partition "
-                        f"{msg.partition()} at offset {msg.offset()}:"
-                        f" {msg.value().decode('utf-8')}"
-                    )
-            messages.append(msg)
-            consumed_count += 1
-            consumer.commit(msg)
-            sleep(0.5)
+            else:
+                logger.info(f"polling message {msg.offset()} {msg.partition()}")
+                if msg.partition() == partition:
+                    if msg.offset() >= offset:
+                        logger.info(f"vamos a consumer el mensaje {msg.offset}")
+                        logger.debug(
+                            f"Consumed message from {msg.topic()} partition "
+                            f"{msg.partition()} at offset {msg.offset()}:"
+                            f" {msg.value().decode('utf-8')}"
+                        )
+                        messages.append(msg)
+                        consumed_count += 1
+                        consumer.commit(msg)
         consumer.close()
         return msg.offset()
     except Exception as e:

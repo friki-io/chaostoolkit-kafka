@@ -47,16 +47,16 @@ def describe_kafka_topic(
         topic_metadata = cluster_metadata.topics[topic]
 
         topic_info = {
-            "Topic": topic,
-            "Partitions": len(topic_metadata.partitions),
+            "topic": topic,
+            "partitions": len(topic_metadata.partitions),
             "partitions_info": {}
         }
 
         for partition_id, partition in topic_metadata.partitions.items():
             topic_info["partitions_info"][str(partition_id)] = {
-                "Leader": partition.leader,
-                "Replicas": list(partition.replicas),
-                "Isr": list(partition.isrs)
+                "leader": partition.leader,
+                "replicas": list(partition.replicas),
+                "isr": list(partition.isrs)
             }
 
         return json.dumps(topic_info, indent=2)
