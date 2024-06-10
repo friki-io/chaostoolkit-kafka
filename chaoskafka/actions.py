@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import List
 from time import sleep
 import threading
 import json
@@ -9,14 +9,13 @@ from confluent_kafka.admin import AdminClient
 from confluent_kafka import (
     Consumer,
     Producer,
-    TopicPartition,
     KafkaError,
     KafkaException)
 
 from chaoslib.exceptions import FailedActivity
 from chaoslib.types import Configuration, Secrets
 
-from chaoskafka.utils import delivery_callback, check_topic_exist
+from chaoskafka.utils import delivery_callback
 from chaoskafka.probes import describe_kafka_topic
 
 
