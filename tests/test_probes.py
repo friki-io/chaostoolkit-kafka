@@ -5,7 +5,8 @@ from chaoskafka.probes import (
     describe_kafka_topic,
     all_replicas_in_sync,
     cluster_doesnt_have_under_replicated_partitions,
-    check_consumer_lag_under_threshold
+    check_consumer_lag_under_threshold,
+    topic_has_no_offline_partitions
 )
 import json
 from confluent_kafka import KafkaException
@@ -49,13 +50,13 @@ def test_describe_kafka_topic_success(mock_admin_client):
     )
 
     expected_output = {
-        "Topic": "test_topic",
-        "Partitions": 1,
+        "topic": "test_topic",
+        "partitions": 1,
         "partitions_info": {
             "0": {
-                "Leader": 1,
-                "Replicas": [1, 2],
-                "Isr": [1, 2]
+                "leader": 1,
+                "replicas": [1, 2],
+                "isr": [1, 2]
             }
         }
     }
@@ -156,6 +157,49 @@ def test_all_replicas_in_sync_exception(mock_admin_client):
 
     expected_error_output = "Some problem checking if all replicas " \
                             "are in sync: Kafka error"
+    assert expected_error_output in str(excinfo.value)
+
+
+@patch('chaoskafka.probes.AdminClient')
+def test_topic_has_no_offline_partitions_success(mock_admin_client):
+    # Setup the mock objects
+    mock_admin_instance = MagicMock()
+    mock_admin_client.return_value = mock_admin_instance
+    mock_cluster_metadata = MagicMock()
+    mock_topic_metadata = MagicMock()
+
+    mock_cluster_metadata.topics = {"test_topic": mock_topic_metadata}
+    mock_topic_metadata.partitions = {
+        0: MagicMock(leader=1, isrs=[1, 2]),
+        1: MagicMock(leader=2, isrs=[2, 1])
+    }
+    mock_admin_instance.list_topics.return_value = mock_cluster_metadata
+
+    result = topic_has_no_offline_partitions(
+        bootstrap_servers="localhost:9092",
+        topic="test_topic"
+    )
+
+    assert result
+
+@patch('chaoskafka.probes.AdminClient')
+def test_topic_has_no_offline_partitions_exception(mock_admin_client):
+    # Setup the mock objects
+    mock_admin_instance = MagicMock()
+    mock_admin_client.return_value = mock_admin_instance
+
+    # Configure the mock to raise a KafkaException
+    mock_admin_instance.list_topics.side_effect = KafkaException(
+        "Kafka error")
+
+    with pytest.raises(FailedActivity) as excinfo:
+        topic_has_no_offline_partitions(
+            bootstrap_servers="localhost:9092",
+            topic="test_topic"
+        )
+
+    expected_error_output = "Some problem checking if the topic has " \
+                            "no offline partitions: Kafka error"
     assert expected_error_output in str(excinfo.value)
 
 
@@ -292,8 +336,13 @@ def test_consumer_lag_under_threshold_exception(mock_consumer_class):
     mock_consumer.list_topics.side_effect = KafkaException("Network error")
 
     with pytest.raises(FailedActivity) as excinfo:
-        check_consumer_lag_under_threshold(bootstrap_servers="localhost:9092", group_id="group1", topic="test_topic", threshold=10)
-    assert "Failed to calculate the lag of the consumer group: Network error" in str(excinfo.value)
+        check_consumer_lag_under_threshold(bootstrap_servers="localhost:9092", 
+                                           group_id="group1",
+                                           topic="test_topic",
+                                           threshold=10)
+    expected_output = "Failed to calculate the lag of the consumer group: " \
+                      "Network error"
+    assert expected_output in str(excinfo.value)
 
 
 @patch('chaoskafka.probes.Consumer')
@@ -307,7 +356,8 @@ def test_consumer_lag_under_threshold_topic_error(mock_consumer_class):
         check_consumer_lag_under_threshold(
             bootstrap_servers="localhost:9092",
             group_id="group1",
-            topic="test_topic",threshold=50
+            topic="test_topic",
+            threshold=50
         )
     expected_output = "Failed to calculate the lag of the consumer group: Error fetching metadata"
     assert expected_output in str(exc_info.value)

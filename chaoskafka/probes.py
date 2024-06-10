@@ -29,12 +29,25 @@ def describe_kafka_topic(
     configuration: Configuration = None, secrets: Secrets = None
 ) -> Dict:
     """
-    The next function is to:
+    Describe a Kafka topic and its partitions.
 
-    * Describe a Kafka topic and its partitions.
-    Check first if the topic exist and then describe the topic.
+    This function retrieves metadata for a specified Kafka topic, including
+    the number of partitions and detailed information about each partition.
+    It first checks if the topic exists in the Kafka cluster.
 
+    Args:
+        bootstrap_servers (str): A comma-separated list of Kafka bootstrap
+        servers.
+        topic (str): The name of the Kafka topic to describe.
+
+    Returns:
+        Dict: A dictionary containing detailed information about the topic and
+        its partitions.
+
+    Raises:
+        FailedActivity: If some kafka exception was raised.
     """
+
     try:
         admin_client = AdminClient(
             {'bootstrap.servers': bootstrap_servers}
@@ -70,10 +83,26 @@ def all_replicas_in_sync(
 ) -> bool:
 
     """
-    The next function is to:
-    * this is a probe that checks if all replicas for each partition are
-    in sync with the leader. If they are, then the topic is healthy.
+    Check if all replicas for each partition of a Kafka topic are in sync with\
+    the leader.
+
+    This function verifies the health of a specified Kafka topic by ensuring
+    that all replicas for each partition are in sync with the leader. If all
+    replicas are in sync, the topic is considered healthy.
+
+    Args:
+        bootstrap_servers (str): A comma-separated list of Kafka bootstrap
+        servers.
+        topic (str): The name of the Kafka topic to check.
+
+    Returns:
+        bool: True if all replicas for each partition are in sync with the
+        leader, False otherwise.
+
+    Raises:
+        FailedActivity: If some kafka exception was raised.
     """
+
     try:
         admin_client = AdminClient(
             {'bootstrap.servers': bootstrap_servers}
@@ -96,14 +125,76 @@ def all_replicas_in_sync(
         ) from e
 
 
+def topic_has_no_offline_partitions(
+    bootstrap_servers: str = None, topic: str = None,
+    configuration: Configuration = None, secrets: Secrets = None
+) -> bool:
+    """
+    Check if a Kafka topic has no offline partitions.
+
+    This function verifies the health of a specified Kafka topic by checking
+    if all its partitions have an active leader and at least one in-sync
+    replica (ISR). If some partition is offline,the topic is not considered
+    healthy.
+
+    Args:
+        bootstrap_servers (str): A comma-separated list of Kafka bootstrap
+        servers.
+        topic (str): The name of the Kafka topic to check.
+
+    Returns:
+        bool: True if all partitions are online and don't have offline
+        replicas, False otherwise.
+
+    Raises:
+        FailedActivity: If some kafka exception was raised.
+    """
+    try:
+        admin_client = AdminClient(
+            {'bootstrap.servers': bootstrap_servers}
+        )
+
+        cluster_metadata = admin_client.list_topics(timeout=10)
+
+        check_topic_exist(topic, cluster_metadata.topics)
+
+        topic_metadata = cluster_metadata.topics[topic]
+
+        # Check if all partitions have a leader and at least one ISR
+        return all(
+            partition.leader != -1 and partition.isrs
+            for _, partition in topic_metadata.partitions.items()
+        )
+    except KafkaException as e:
+        raise FailedActivity(
+            "Some problem checking if the topic has no offline partitions: "
+            f"{e}"
+        ) from e
+
+
 def cluster_doesnt_have_under_replicated_partitions(
     bootstrap_servers: str = None,
     configuration: Configuration = None, secrets: Secrets = None
 ) -> bool:
 
     """
-    The next function is to:
-    * Check if the cluster has under replicated partitions.
+    Check if the Kafka cluster has under-replicated partitions.
+
+    This function verifies the health of the entire Kafka cluster by checking
+    if any partition is under-replicated. A partition is considered
+    under-replicated if the number of in-sync replicas (ISRs) is less
+    than the total number of replicas.
+
+    Args:
+        bootstrap_servers (str): A comma-separated list of Kafka bootstrap
+        servers.
+
+    Returns:
+        bool: True if no partition in the cluster is under-replicated,
+        False otherwise.
+
+    Raises:
+        KafkaException: If there is an underlying Kafka-related error.
     """
 
     try:
@@ -134,11 +225,30 @@ def check_consumer_lag_under_threshold(
 ) -> bool:
 
     """
-    The next function is to:
+    Check if the consumer lag is under a certain threshold for a
+    specific partition or all partitions.
 
-    * Check if the consumer lag is under a certain threshold in any partition
-        or some specific partition.
+    This function checks the consumer lag for a specified Kafka topic and
+    consumer group, and verifies if the lag is under a defined threshold.
+    It can check the lag for either a specific partition or all partitions.
+
+    Args:
+        bootstrap_servers (str): A comma-separated list of Kafka bootstrap
+        servers.
+        group_id (str): The consumer group ID.
+        topic (str): The name of the Kafka topic.
+        threshold (int): The maximum allowable lag threshold.
+        partition (Optional[int]): The specific partition to check. If None,
+        checks all partitions.
+
+    Returns:
+        bool: True if the consumer lag is under the threshold for the
+        specified partition or all partitions, False otherwise.
+
+    Raises:
+        FailedActivity: If there is an issue accessing the cluster metadata.
     """
+
     try:
         consumer = Consumer(
             {'bootstrap.servers': bootstrap_servers, 'group.id': group_id}
