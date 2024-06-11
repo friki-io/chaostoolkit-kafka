@@ -6,11 +6,7 @@ import json
 import logging
 
 from confluent_kafka.admin import AdminClient
-from confluent_kafka import (
-    Consumer,
-    Producer,
-    KafkaError,
-    KafkaException)
+from confluent_kafka import Consumer, Producer, KafkaError, KafkaException
 
 from chaoslib.exceptions import FailedActivity
 from chaoslib.types import Configuration, Secrets
@@ -19,11 +15,13 @@ from chaoskafka.utils import delivery_callback
 from chaoskafka.probes import describe_kafka_topic
 
 
-__all__ = ["delete_kafka_topic",
-           "rebalance_consumer_group",
-           "delete_consumer_group",
-           "produce_messages",
-           "consume_messages"]
+__all__ = [
+    "delete_kafka_topic",
+    "rebalance_consumer_group",
+    "delete_consumer_group",
+    "produce_messages",
+    "consume_messages",
+]
 
 logger = logging.getLogger("chaostoolkit")
 
@@ -32,7 +30,7 @@ def delete_kafka_topic(
     bootstrap_servers: str = None,
     topic: str = None,
     configuration: Configuration = None,
-    secrets: Secrets = None
+    secrets: Secrets = None,
 ) -> bool:
     """
     Delete a Kafka topic.
@@ -52,9 +50,7 @@ def delete_kafka_topic(
         FailedActivity: If there is an issue deleting the topic.
     """
 
-    admin_client = AdminClient(
-        {'bootstrap.servers': bootstrap_servers}
-    )
+    admin_client = AdminClient({"bootstrap.servers": bootstrap_servers})
 
     fs = admin_client.delete_topics([topic], operation_timeout=30)
 
@@ -72,7 +68,7 @@ def rebalance_consumer_group(
     topic: str = None,
     group_id: str = None,
     configuration: Configuration = None,
-    secrets: Secrets = None
+    secrets: Secrets = None,
 ) -> bool:
     """
     Rebalance a Kafka consumer group.
@@ -100,7 +96,7 @@ def rebalance_consumer_group(
         raise FailedActivity("The topic to subscribe is None")
     try:
         consumer = Consumer(
-            {'bootstrap.servers': bootstrap_servers, 'group.id': group_id}
+            {"bootstrap.servers": bootstrap_servers, "group.id": group_id}
         )
         consumer.subscribe([topic])
         sleep(3)
@@ -114,8 +110,10 @@ def rebalance_consumer_group(
 
 
 def delete_consumer_group(
-    bootstrap_servers: str = None, group_id: str = None,
-    configuration: Configuration = None, secrets: Secrets = None
+    bootstrap_servers: str = None,
+    group_id: str = None,
+    configuration: Configuration = None,
+    secrets: Secrets = None,
 ) -> bool:
     """
     Delete a Kafka consumer group.
@@ -139,9 +137,7 @@ def delete_consumer_group(
     """
 
     try:
-        admin_client = AdminClient(
-            {'bootstrap.servers': bootstrap_servers}
-        )
+        admin_client = AdminClient({"bootstrap.servers": bootstrap_servers})
 
         groups = admin_client.delete_consumer_groups(
             [group_id], request_timeout=10
@@ -164,7 +160,7 @@ def produce_messages(
     messages: List[str] = [],
     partition: int = 0,
     configuration: Configuration = None,
-    secrets: Secrets = None
+    secrets: Secrets = None,
 ) -> List[dict]:
     """
     Produce messages to a Kafka topic.
@@ -225,9 +221,8 @@ def consume_messages(
     offset: int = 0,
     num_messages: int = 1,
     configuration: Configuration = None,
-    secrets: Secrets = None
+    secrets: Secrets = None,
 ) -> List[dict]:
-
     """
     Consume messages from a Kafka topic.
 
@@ -260,7 +255,7 @@ def consume_messages(
         raise FailedActivity("The topic to consume a message is None")
     try:
         topic_data = json.loads(describe_kafka_topic(bootstrap_servers, topic))
-        partitions = topic_data['partitions']
+        partitions = topic_data["partitions"]
         if partition > partitions:
             raise FailedActivity(
                 f"Partition {partition} does not exist in topic {topic}"
@@ -279,15 +274,17 @@ def consume_messages(
             threading.Thread(
                 name=f"consume_{client_id}",
                 target=__consume_messages,
-                args=(bootstrap_servers,
-                      group_id,
-                      topic,
-                      partition,
-                      offset,
-                      num_messages,
-                      client_id,
-                      stop_event,
-                      messages),
+                args=(
+                    bootstrap_servers,
+                    group_id,
+                    topic,
+                    partition,
+                    offset,
+                    num_messages,
+                    client_id,
+                    stop_event,
+                    messages,
+                ),
             )
             for client_id in client_ids
         ]
@@ -315,55 +312,59 @@ def __consume_messages(
     num_messages: int = 1,
     client_id: str = None,
     stop_event: threading.Event = None,
-    messages: list = []
+    messages: list = [],
 ) -> List[dict]:
-
     """
     Consume messages from a Kafka topic. check the consume_messages function.
     """
 
     try:
         consumer = Consumer(
-                {
-                    "bootstrap.servers": bootstrap_servers,
-                    "group.id": group_id,
-                    'enable.auto.commit': False,
-                    "client.id": client_id
-                }
-            )
+            {
+                "bootstrap.servers": bootstrap_servers,
+                "group.id": group_id,
+                "enable.auto.commit": False,
+                "client.id": client_id,
+            }
+        )
 
         logger.info(f"Subscribing to topic {topic}")
         consumer.subscribe([topic])
         logger.info(f"Subscribed to topic {topic}")
         consumed_count = 0
 
-        while ((num_messages is None or consumed_count < num_messages)
-                and not stop_event.is_set()):
+        while (
+            num_messages is None or consumed_count < num_messages
+        ) and not stop_event.is_set():
             msg = consumer.poll(timeout=1.0)
             if msg is None:
                 continue
             if msg.error():
                 if msg.error().code() != KafkaError._PARTITION_EOF:
-                    logger.debug(f"End of partition reached {msg.topic()}/"
-                                 f"{msg.partition()}")
+                    logger.debug(
+                        f"End of partition reached {msg.topic()}/"
+                        f"{msg.partition()}"
+                    )
                     raise KafkaException(msg.error())
             elif msg.partition() == partition:
                 if msg.offset() >= offset:
                     logger.info(
-                                "We are going to consume the message "
-                                f"in the offset: {msg.offset()}"
-                            )
+                        "We are going to consume the message "
+                        f"in the offset: {msg.offset()}"
+                    )
 
                     logger.debug(
                         f"Consumed message from {msg.topic()} partition "
                         f"{msg.partition()} at offset {msg.offset()}:"
                         f" {msg.value().decode('utf-8')}"
                     )
-                    messages.append({
-                        "partition": msg.partition(),
-                        "offset": msg.offset(),
-                        "value": msg.value().decode('utf-8')
-                    })
+                    messages.append(
+                        {
+                            "partition": msg.partition(),
+                            "offset": msg.offset(),
+                            "value": msg.value().decode("utf-8"),
+                        }
+                    )
                     consumed_count += 1
                     consumer.commit(msg)
         consumer.close()

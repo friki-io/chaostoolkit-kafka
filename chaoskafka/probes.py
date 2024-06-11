@@ -3,10 +3,7 @@ import json
 import logging
 
 from confluent_kafka.admin import AdminClient
-from confluent_kafka import (
-    TopicPartition,
-    Consumer,
-    KafkaException)
+from confluent_kafka import TopicPartition, Consumer, KafkaException
 
 from chaoslib.exceptions import FailedActivity
 from chaoslib.types import Configuration, Secrets
@@ -19,15 +16,17 @@ __all__ = [
     "all_replicas_in_sync",
     "cluster_doesnt_have_under_replicated_partitions",
     "check_consumer_lag_under_threshold",
-    "topic_has_no_offline_partitions"
-    ]
+    "topic_has_no_offline_partitions",
+]
 
 logger = logging.getLogger("chaostoolkit")
 
 
 def describe_kafka_topic(
-    bootstrap_servers: str = None, topic: str = None,
-    configuration: Configuration = None, secrets: Secrets = None
+    bootstrap_servers: str = None,
+    topic: str = None,
+    configuration: Configuration = None,
+    secrets: Secrets = None,
 ) -> Dict:
     """
     Describe a Kafka topic and its partitions.
@@ -50,9 +49,7 @@ def describe_kafka_topic(
     """
 
     try:
-        admin_client = AdminClient(
-            {'bootstrap.servers': bootstrap_servers}
-        )
+        admin_client = AdminClient({"bootstrap.servers": bootstrap_servers})
 
         cluster_metadata = admin_client.list_topics(timeout=10)
 
@@ -63,14 +60,14 @@ def describe_kafka_topic(
         topic_info = {
             "topic": topic,
             "partitions": len(topic_metadata.partitions),
-            "partitions_info": {}
+            "partitions_info": {},
         }
 
         for partition_id, partition in topic_metadata.partitions.items():
             topic_info["partitions_info"][str(partition_id)] = {
                 "leader": partition.leader,
                 "replicas": list(partition.replicas),
-                "isr": list(partition.isrs)
+                "isr": list(partition.isrs),
             }
 
         return json.dumps(topic_info, indent=2)
@@ -79,10 +76,11 @@ def describe_kafka_topic(
 
 
 def all_replicas_in_sync(
-    bootstrap_servers: str = None, topic: str = None,
-    configuration: Configuration = None, secrets: Secrets = None
+    bootstrap_servers: str = None,
+    topic: str = None,
+    configuration: Configuration = None,
+    secrets: Secrets = None,
 ) -> bool:
-
     """
     Check if all replicas for each partition of a Kafka topic are in sync with\
     the leader.
@@ -105,9 +103,7 @@ def all_replicas_in_sync(
     """
 
     try:
-        admin_client = AdminClient(
-            {'bootstrap.servers': bootstrap_servers}
-        )
+        admin_client = AdminClient({"bootstrap.servers": bootstrap_servers})
 
         cluster_metadata = admin_client.list_topics(timeout=10)
 
@@ -121,14 +117,15 @@ def all_replicas_in_sync(
         )
     except KafkaException as e:
         raise FailedActivity(
-            "Some problem checking if all replicas are in sync: "
-            f"{e}"
+            "Some problem checking if all replicas are in sync: " f"{e}"
         ) from e
 
 
 def topic_has_no_offline_partitions(
-    bootstrap_servers: str = None, topic: str = None,
-    configuration: Configuration = None, secrets: Secrets = None
+    bootstrap_servers: str = None,
+    topic: str = None,
+    configuration: Configuration = None,
+    secrets: Secrets = None,
 ) -> bool:
     """
     Check if a Kafka topic has no offline partitions.
@@ -151,9 +148,7 @@ def topic_has_no_offline_partitions(
         FailedActivity: If some kafka exception was raised.
     """
     try:
-        admin_client = AdminClient(
-            {'bootstrap.servers': bootstrap_servers}
-        )
+        admin_client = AdminClient({"bootstrap.servers": bootstrap_servers})
 
         cluster_metadata = admin_client.list_topics(timeout=10)
 
@@ -175,9 +170,9 @@ def topic_has_no_offline_partitions(
 
 def cluster_doesnt_have_under_replicated_partitions(
     bootstrap_servers: str = None,
-    configuration: Configuration = None, secrets: Secrets = None
+    configuration: Configuration = None,
+    secrets: Secrets = None,
 ) -> bool:
-
     """
     Check if the Kafka cluster has under-replicated partitions.
 
@@ -199,9 +194,7 @@ def cluster_doesnt_have_under_replicated_partitions(
     """
 
     try:
-        admin_client = AdminClient(
-            {'bootstrap.servers': bootstrap_servers}
-        )
+        admin_client = AdminClient({"bootstrap.servers": bootstrap_servers})
 
         cluster_metadata = admin_client.list_topics(timeout=10)
 
@@ -220,11 +213,14 @@ def cluster_doesnt_have_under_replicated_partitions(
 
 
 def check_consumer_lag_under_threshold(
-    bootstrap_servers: str = None, group_id: str = None,
-    topic: str = None, threshold: int = 0, partition: Optional[int] = None,
-    configuration: Configuration = None, secrets: Secrets = None
+    bootstrap_servers: str = None,
+    group_id: str = None,
+    topic: str = None,
+    threshold: int = 0,
+    partition: Optional[int] = None,
+    configuration: Configuration = None,
+    secrets: Secrets = None,
 ) -> bool:
-
     """
     Check if the consumer lag is under a certain threshold for a
     specific partition or all partitions.
@@ -252,7 +248,7 @@ def check_consumer_lag_under_threshold(
 
     try:
         consumer = Consumer(
-            {'bootstrap.servers': bootstrap_servers, 'group.id': group_id}
+            {"bootstrap.servers": bootstrap_servers, "group.id": group_id}
         )
         metadata = consumer.list_topics(topic, timeout=10)
         if metadata.topics[topic].error is not None:
@@ -263,8 +259,9 @@ def check_consumer_lag_under_threshold(
         committed = consumer.committed(partitions, timeout=10)
         lags = []
         for p in committed:
-            (lo, hi) = consumer.get_watermark_offsets(p, timeout=10,
-                                                      cached=False)
+            (lo, hi) = consumer.get_watermark_offsets(
+                p, timeout=10, cached=False
+            )
 
             lag = "%d" % (hi - lo) if p.offset < 0 else "%d" % (hi - p.offset)
             lags.append(int(lag))
@@ -278,6 +275,5 @@ def check_consumer_lag_under_threshold(
         )
     except KafkaException as e:
         raise FailedActivity(
-            "Failed to calculate the lag of the consumer group: "
-            f"{e}"
+            "Failed to calculate the lag of the consumer group: " f"{e}"
         ) from e

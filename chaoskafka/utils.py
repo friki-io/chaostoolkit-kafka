@@ -15,8 +15,8 @@ def delivery_callback(output: list = []):
                 dict(
                     topic=msg.topic(),
                     partition=msg.partition(),
-                    offset=msg.offset()
+                    offset=msg.offset(),
                 )
             )
-    return handler
 
+    return handler

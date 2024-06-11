@@ -18,9 +18,9 @@ def test_delivery_callback_success():
     callback(None, msg)
 
     assert len(output) == 1
-    assert output[0]['topic'] == "test_topic"
-    assert output[0]['partition'] == 0
-    assert output[0]['offset'] == 42
+    assert output[0]["topic"] == "test_topic"
+    assert output[0]["partition"] == 0
+    assert output[0]["offset"] == 42
 
 
 def test_delivery_callback_error():
