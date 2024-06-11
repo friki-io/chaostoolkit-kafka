@@ -27,7 +27,6 @@ def test_delivery_callback_error():
     output = []
     callback = delivery_callback(output)
 
-    # Simular un error en el mensaje
     error = MagicMock()
     error.__str__.return_value = "Test error"
 

@@ -298,7 +298,7 @@ def consume_messages(
         for task in tasks:
             task.join()
 
-        logger.info(f"Consumed messages: {messages}")
+        logger.debug(f"Consumed messages: {messages}")
         return messages
     except Exception as e:
         raise FailedActivity(

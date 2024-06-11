@@ -18,7 +18,8 @@ __all__ = [
     "describe_kafka_topic",
     "all_replicas_in_sync",
     "cluster_doesnt_have_under_replicated_partitions",
-    "check_consumer_lag_under_threshold"
+    "check_consumer_lag_under_threshold",
+    "topic_has_no_offline_partitions"
     ]
 
 logger = logging.getLogger("chaostoolkit")
