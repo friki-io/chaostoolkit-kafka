@@ -47,6 +47,8 @@ jobs:
 
   upload-gh-release-assets:
     runs-on: ubuntu-22.04
+    permissions:
+      contents: write
     needs:
       - create-gh-release
       - release-to-pypi
