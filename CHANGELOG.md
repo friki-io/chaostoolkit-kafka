@@ -4,6 +4,9 @@
 
 [Unreleased]: https://github.com/jitapichab/chaostoolkit-kafka
 
+
+[0.1.0]: https://github.com/friki-io/chaostoolkit-kafka/tree/0.1.0
+
 ### Added 
 
 - **Actions**:
