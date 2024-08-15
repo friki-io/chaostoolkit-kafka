@@ -2,8 +2,19 @@
 
 ## [Unreleased][]
 
-[Unreleased]: https://github.com/jitapichab/chaostoolkit-kafka
+[Unreleased]: https://github.com/friki-io/chaostoolkit-kafka
 
+[0.1.1]: https://github.com/friki-io/chaostoolkit-kafka/tree/0.1.1
+
+## [0.1.1][]
+
+[Unreleased]: https://github.com/friki-io/chaostoolkit-kafka
+
+### Fix
+
+- release github workflows permissions
+
+## [0.1.0][]
 
 [0.1.0]: https://github.com/friki-io/chaostoolkit-kafka/tree/0.1.0
 
