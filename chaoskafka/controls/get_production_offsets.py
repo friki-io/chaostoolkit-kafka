@@ -1,13 +1,17 @@
-from chaoslib.types import Configuration, \
-    Activity, Run, Secrets
+from chaoslib.types import Configuration, Activity, Run, Secrets
 
 import logging
 
 logger = logging.getLogger("chaostoolkit")
 
-def after_activity_control(context: Activity, state: Run,
-                           configuration: Configuration = None,
-                           secrets: Secrets = None, **kwargs):
+
+def after_activity_control(
+    context: Activity,
+    state: Run,
+    configuration: Configuration = None,
+    secrets: Secrets = None,
+    **kwargs,
+):
     # sourcery skip: remove-unnecessary-cast
     """
     This control is to use with the `produce_messages` action, the idea is
@@ -29,5 +33,6 @@ def after_activity_control(context: Activity, state: Run,
     configuration["partition"] = partition
     configuration["earliest"] = int(earliest)
     configuration["num_messages"] = int(num_messages)
-    logger.debug(f"Earliest offset: {earliest}, "
-                 f"Number of messages: {num_messages}")
+    logger.debug(
+        f"Earliest offset: {earliest}, " f"Number of messages: {num_messages}"
+    )

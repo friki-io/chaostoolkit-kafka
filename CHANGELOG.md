@@ -4,13 +4,21 @@
 
 [Unreleased]: https://github.com/friki-io/chaostoolkit-kafka
 
+
+## [0.1.2][]
+
+[0.1.2]: https://github.com/friki-io/chaostoolkit-kafka/tree/0.1.2
+
+### Added 
+
+- **Controls**
+  - `get_production_offsets` to use with `produce_messages` action.
+
 [0.1.1]: https://github.com/friki-io/chaostoolkit-kafka/tree/0.1.1
 
 ## [0.1.1][]
 
-[Unreleased]: https://github.com/friki-io/chaostoolkit-kafka
-
-### Fix
+### Fixed
 
 - release github workflows permissions
 
