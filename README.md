@@ -27,33 +27,33 @@ A typical experiment using this extension would look like this:
 
 ```json
 {
-  "title": "Reboot MSK broker and check the health of a target topic!!",
-  "description": "Experiment to ensure that topics should not have offline partitions after a restart",
+  "title": "Kafka Consumer Lag and Corruption Chaos Experiment",
+  "description": "This experiment simulates a Kafka chaos scenario by producing a corrupt message and monitoring whether the consumer group experiences lag exceeding a specified threshold.",
   "configuration": {
-    "aws_profile_name": "aws-profile-msk",
-    "boostrap_servers": "msk_bootstrap_servers:9092",
-    "aws_region": "aws_region",
-    "cluster_arn": "arn_msk_broker",
-    "broker_ids": [
-      "1"
-    ],
-    "recovery_time": 120,
-    "topic": "kafka-test-offline"
+    "bootstrap_servers": {
+      "type": "env",
+      "key": "BOOTSTRAP_SERVERS"
+    },
+    "topic": "poke-orders",
+    "group_id": "poke-order-consumer"
   },
   "steady-state-hypothesis": {
-    "title": "After Rebooting the Kafka broker, the topic shouldn't have offline partitions",
+    "title": "Check if the consumer group has lag under threshold",
     "probes": [
       {
-        "name": "Check that Kafka topic doesn't have offline partitions!!",
+        "name": "Consumer group has lag under the threshold",
         "type": "probe",
         "tolerance": true,
         "provider": {
           "type": "python",
           "module": "chaoskafka.probes",
-          "func": "topic_has_no_offline_partitions",
+          "func": "check_consumer_lag_under_threshold",
           "arguments": {
-            "bootstrap_servers": "${boostrap_servers}",
-            "topic": "${topic}"
+            "bootstrap_servers": "${bootstrap_servers}",
+            "group_id": "${group_id}",
+            "topic": "${topic}",
+            "threshold": 15,
+            "partition": 1
           }
         }
       }
@@ -62,18 +62,48 @@ A typical experiment using this extension would look like this:
   "method": [
     {
       "type": "action",
-      "name": "Reboot MSK broker",
+      "name": "Produce corrupt Kafka message",
       "provider": {
         "type": "python",
-        "module": "chaosaws.msk.actions",
-        "func": "reboot_msk_broker",
+        "module": "chaoskafka.actions",
+        "func": "produce_messages",
         "arguments": {
-          "cluster_arn": "${cluster_arn}",
-          "broker_ids": "${broker_ids}"
+          "bootstrap_servers": "${bootstrap_servers}",
+          "topic": "${topic}",
+          "partition": 1,
+          "messages": ["corrupted_message"]
         }
       },
       "pauses": {
-        "after": "${recovery_time}"
+        "after": 120
+      },
+      "controls": [
+        {
+          "name": "calculate offsets and num_messages",
+          "provider": {
+            "type": "python",
+            "module": "chaoskafka.controls.get_production_offsets"
+          }
+        }
+      ]
+    }
+  ],
+  "rollbacks": [
+    {
+      "type": "action",
+      "name": "Manually Consume Unprocessable Kafka Message",
+      "provider": {
+        "type": "python",
+        "module": "chaoskafka.actions",
+        "func": "consume_messages",
+        "arguments": {
+          "bootstrap_servers": "${bootstrap_servers}",
+          "topic": "${topic}",
+          "group_id": "${group_id}",
+          "partition": 1,
+          "offset": "${earliest}",
+          "num_messages": "${num_messages}"
+        }
       }
     }
   ]
