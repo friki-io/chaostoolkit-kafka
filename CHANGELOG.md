@@ -4,6 +4,13 @@
 
 [Unreleased]: https://github.com/friki-io/chaostoolkit-kafka
 
+## [0.1.3][]
+
+[0.1.3]: https://github.com/friki-io/chaostoolkit-kafka/tree/0.1.2
+
+### Changed
+
+- Updated README example to include more functions provided by the library.
 
 ## [0.1.2][]
 
